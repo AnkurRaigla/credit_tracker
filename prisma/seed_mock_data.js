@@ -1,9 +1,24 @@
 const { PrismaClient } = require("@prisma/client");
-const { PrismaBetterSqlite3 } = require("@prisma/adapter-better-sqlite3");
 
-// Instantiate adapter by passing options object with 'url'
-const adapter = new PrismaBetterSqlite3({ url: "file:./prisma/dev.db" });
-const prisma = new PrismaClient({ adapter });
+let prisma;
+const dbUrl = process.env.DATABASE_URL || "file:./prisma/dev.db";
+
+if (dbUrl.startsWith("file:") || dbUrl.endsWith(".db") || dbUrl.includes("dev.db")) {
+  try {
+    const { PrismaBetterSqlite3 } = require("@prisma/adapter-better-sqlite3");
+    let normalizedUrl = dbUrl;
+    if (dbUrl === "file:./dev.db") {
+      normalizedUrl = "file:./prisma/dev.db";
+    }
+    const adapter = new PrismaBetterSqlite3({ url: normalizedUrl });
+    prisma = new PrismaClient({ adapter });
+  } catch (error) {
+    console.error("Error creating SQLite adapter, falling back to standard:", error);
+    prisma = new PrismaClient();
+  }
+} else {
+  prisma = new PrismaClient();
+}
 
 // Passing grades
 const PASSING_GRADES = ["O", "A+", "A", "B+", "B", "C", "P", "S"];
