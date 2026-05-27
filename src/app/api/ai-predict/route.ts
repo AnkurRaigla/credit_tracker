@@ -70,8 +70,8 @@ ACADEMIC RISK ASSESSMENT:
 - Risk Flags: ${audit.riskReasons.join(", ")}
 `;
 
-    // Check if user has configured the Gemini API Key
-    const apiKey = process.env.GEMINI_API_KEY;
+    // Check if user has configured the Gemini / Groq API Key
+    const apiKey = process.env.GEMINI_API_KEY || process.env.GROQ_API_KEY;
 
     if (!apiKey) {
       // Return a highly realistic, tailored mock counseling report
@@ -79,7 +79,50 @@ ACADEMIC RISK ASSESSMENT:
       return NextResponse.json({ analysis: mockReport, isMock: true });
     }
 
-    // 5. Initialize Gemini Client & Generate Analysis
+    if (apiKey.startsWith("gsk_")) {
+      // 5a. Call Groq API (OpenAI compatible high-speed inference)
+      console.log("Using Groq API for counseling report generation...");
+      try {
+        const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+          method: "POST",
+          headers: {
+            "Authorization": `Bearer ${apiKey}`,
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            model: "llama-3.3-70b-versatile",
+            messages: [
+              { role: "system", content: systemPrompt },
+              { role: "user", content: `Here is the student's profile:\n${studentProfileStr}` }
+            ],
+            temperature: 0.2
+          })
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}));
+          console.error("Groq API error response:", errorData);
+          throw new Error(`Groq API error: ${response.statusText}`);
+        }
+
+        const data = await response.json();
+        const text = data.choices?.[0]?.message?.content;
+        if (!text) {
+          throw new Error("Empty response from Groq API");
+        }
+
+        return NextResponse.json({ analysis: text, isMock: false });
+      } catch (err) {
+        console.error("Groq API call failed, falling back to local simulation:", err);
+        const mockReport = generateMockCounselingReport(student.name, audit);
+        return NextResponse.json({ 
+          analysis: mockReport + "\n\n*(Note: Groq API call encountered a transient error. Switched to local counseling simulation).* ", 
+          isMock: true 
+        });
+      }
+    }
+
+    // 5b. Initialize Gemini Client & Generate Analysis (Standard Fallback)
     const genAI = new GoogleGenerativeAI(apiKey);
     const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
