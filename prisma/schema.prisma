@@ -1,0 +1,55 @@
+datasource db {
+  provider = "sqlite"
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  name      String
+  password  String   // Hashed password
+  role      String   @default("ADVISOR") // ADMIN or ADVISOR
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model SubjectMaster {
+  code      String   @id // e.g., "CS101"
+  name      String
+  credits   Float
+  category  String   // HS, BS, ES, PC, PE, OE, PW, MNC
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  grades    Grade[]
+}
+
+model Student {
+  rollNumber String   @id // e.g., "22ADR001"
+  name       String
+  section    String   // e.g., "A", "B"
+  department String   // e.g., "CSE", "ECE", "ME"
+  semester   Int      @default(1) // Current semester
+  cgpa       Float    @default(0.0)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  grades     Grade[]
+}
+
+model Grade {
+  id          String        @id @default(cuid())
+  studentId   String
+  student     Student       @relation(fields: [studentId], references: [rollNumber], onDelete: Cascade)
+  subjectCode String
+  subject     SubjectMaster @relation(fields: [subjectCode], references: [code])
+  subjectName String        // Snapshot at upload
+  credits     Float        // Snapshot at upload
+  category    String        // HS, BS, ES, etc.
+  semester    Int          // Semester when course was taken (1-8)
+  grade       String        // e.g., "O", "A", "F", "Ab"
+  earned      Float        // Calculated (credits if passed, 0 if failed)
+  isBacklog   Boolean       @default(false)
+  createdAt   DateTime      @default(now())
+}
